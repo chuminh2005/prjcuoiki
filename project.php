@@ -17,7 +17,7 @@ if (!$project) {
 }
 
 $is_owner = ($project['id_user'] == $user['id_user']);
-$stmt = $pdo->prepare("SELECT project_role FROM member WHERE id_project = ? AND id_user = ?");
+$stmt = $pdo->prepare("SELECT project_role FROM member WHERE id_project = ? AND id_user = ? AND flag = 'active'");
 $stmt->execute([$project_id, $user['id_user']]);
 $member = $stmt->fetch();
 $user_role = $member ? $member['project_role'] : null;
@@ -29,7 +29,7 @@ if ($project['visibility'] == 'private' && !$is_owner && !$user_role) {
 
 $can_settings = $is_owner || $user_role == 'manager';
 
-$stmt = $pdo->prepare("SELECT COUNT(*) as count FROM member WHERE id_project = ?");
+$stmt = $pdo->prepare("SELECT COUNT(*) as count FROM member WHERE id_project = ? AND flag = 'active'");
 $stmt->execute([$project_id]);
 $member_count = $stmt->fetch()['count'];
 
