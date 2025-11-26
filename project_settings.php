@@ -17,7 +17,7 @@ if (!$project) {
 }
 
 $is_owner = ($project['id_user'] == $user['id_user']);
-$stmt = $pdo->prepare("SELECT project_role FROM member WHERE id_project = ? AND id_user = ?");
+$stmt = $pdo->prepare("SELECT project_role FROM member WHERE id_project = ? AND id_user = ? AND flag = 'active'");
 $stmt->execute([$project_id, $user['id_user']]);
 $member = $stmt->fetch();
 $is_manager = $member && $member['project_role'] == 'manager';
@@ -33,7 +33,7 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $action = $_POST['action'] ?? '';
     // update thông tin dự án
-    if ($action == 'update_info' && $is_owner) {
+    if ($action == 'update_info' && $is_owner ) {
         $title = trim($_POST['title'] ?? '');
         $description = trim($_POST['description'] ?? '');
         $visibility = $_POST['visibility'] ?? 'private';
@@ -91,40 +91,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // xử lý theo hướng cập nhật thêm 1 bản ghi mới chứ không sửa bản ghi cũ, không update
     if ($action == 'update_role' && ($is_owner || $is_manager)) {
         $member_id = $_POST['member_id'] ?? 0;
-        $new_role = $_POST['new_role'] ?? 'viewer';
+        $new_role  = $_POST['new_role'] ?? 'viewer';
+        $valid_roles = ['viewer', 'commenter', 'contributor', 'manager'];
 
-        if (!in_array($new_role, ['viewer', 'commenter', 'contributor', 'manager'])) {
+        if (!in_array($new_role, $valid_roles)) {
             $error = 'Vai trò không hợp lệ!';
         } else {
-            try {
-                $pdo->beginTransaction();
+            $stmt = $pdo->prepare("SELECT project_role FROM member WHERE id_member = ? AND id_project = ? AND flag = 'active'");
+            $stmt->execute([$member_id, $project_id]);
+            $target_member = $stmt->fetch();
 
-                // Lấy thông tin bản ghi member cũ (chỉ khi đang active)
-                $stmt = $pdo->prepare("SELECT id_user FROM member WHERE id_member = ? AND id_project = ? AND flag = 'active' FOR UPDATE");
-                $stmt->execute([$member_id, $project_id]);
-                $old = $stmt->fetch();
-
-                if (!$old) {
-                    $pdo->rollBack();
-                    $error = 'Thành viên không tồn tại hoặc đã bị xóa!';
-                } else {
-                    // Deactive bản ghi cũ
-                    $stmt = $pdo->prepare("UPDATE member SET flag = 'deactive', end_at = current_timestamp() WHERE id_member = ? AND id_project = ?");
-                    $stmt->execute([$member_id, $project_id]);
-
-                    // Thêm bản ghi mới với vai trò mới (join_at mặc định là current_timestamp)
-                    $stmt = $pdo->prepare("INSERT INTO member (id_user, id_project, project_role) VALUES (?, ?, ?)");
-                    $stmt->execute([$old['id_user'], $project_id, $new_role]);
-
-                    $pdo->commit();
-                    $success = 'Cập nhật vai trò thành công!';
+            if (!$target_member) {
+                $error = 'Thành viên không tồn tại hoặc đã bị xóa!';
+            } else {
+                $allow_update = true;
+                if ($is_manager && !$is_owner) {
+                    if ($target_member['project_role'] == 'manager') {
+                        $error = 'Bạn không có quyền thay đổi vai trò của Quản lý (Manager) khác!';
+                        $allow_update = false;
+                    }
+                    elseif ($new_role == 'manager') {
+                        $error = 'Bạn không có quyền bổ nhiệm Quản lý (Manager)!';
+                        $allow_update = false;
+                    }
                 }
-            } catch (Exception $e) {
-                if ($pdo->inTransaction()) $pdo->rollBack();
-                $error = 'Lỗi khi cập nhật vai trò: ' . $e->getMessage();
+
+                if ($allow_update) {
+                    $stmt = $pdo->prepare("UPDATE member SET project_role = ? WHERE id_member = ? AND id_project = ?");
+                    if ($stmt->execute([$new_role, $member_id, $project_id])) {
+                        $success = 'Cập nhật vai trò thành công!';
+                    } else {
+                        $error = 'Có lỗi xảy ra khi cập nhật Database.';
+                    }
+                }
             }
         }
-    }
+    }  
+
     
     
     if ($action == 'remove_member' && ($is_owner || $is_manager)) {
@@ -551,12 +554,12 @@ $members = $stmt->fetchAll();
                 </div>
             </div>
             
-            <div class="settings-card">
+            <!-- <div class="settings-card">
                 <h2>Vai trò trong dự án</h2>
                 <div style="line-height: 1.8;">
 
                 </div>
-            </div>
+            </div> -->
             
             <?php if ($is_owner): ?>
             <div class="settings-card">
