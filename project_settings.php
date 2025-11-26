@@ -551,12 +551,12 @@ $members = $stmt->fetchAll();
                 </div>
             </div>
             
-            <div class="settings-card">
+            <!-- <div class="settings-card">
                 <h2>Vai trò trong dự án</h2>
                 <div style="line-height: 1.8;">
 
                 </div>
-            </div>
+            </div> -->
             
             <?php if ($is_owner): ?>
             <div class="settings-card">
