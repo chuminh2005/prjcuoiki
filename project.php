@@ -19,7 +19,7 @@ if (!$project) {
 
 // Kiểm tra quyền user
 $is_owner = ($project['id_user'] == $user['id_user']);
-$stmt = $pdo->prepare("SELECT project_role FROM member WHERE id_project = ? AND id_user = ?");
+$stmt = $pdo->prepare("SELECT project_role FROM member WHERE id_project = ? AND id_user = ? AND flag = 'active'");
 $stmt->execute([$project_id, $user['id_user']]);
 $member = $stmt->fetch();
 $user_role = $member ? $member['project_role'] : null;
@@ -34,8 +34,10 @@ if ($project['visibility'] == 'private' && !$is_owner && !$user_role) {
 $can_settings = $is_owner || $user_role == 'manager';
 $can_create_content = $is_owner || in_array($user_role, ['manager', 'contributor']);
 $can_approve = $is_owner || $user_role == 'manager';
+// Quyền bình luận: Owner, Manager, Contributor, Commenter
+$can_comment = $is_owner || in_array($user_role, ['manager', 'contributor', 'commenter']);
 
-$stmt = $pdo->prepare("SELECT COUNT(*) as count FROM member WHERE id_project = ?");
+$stmt = $pdo->prepare("SELECT COUNT(*) as count FROM member WHERE id_project = ? AND flag = 'active'");
 $stmt->execute([$project_id]);
 $member_count = $stmt->fetch()['count'];
 
@@ -139,6 +141,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // --- XỬ LÝ BÌNH LUẬN ---
+    // Thêm bình luận
+    if ($action === 'add_comment') {
+        if (!$can_comment) {
+            $error = 'Bạn không có quyền bình luận.';
+        } else {
+            $content_id_cmt = intval($_POST['content_id'] ?? 0);
+            $cmt_text = trim($_POST['comment_content'] ?? '');
+            
+            if (!empty($cmt_text) && $content_id_cmt > 0) {
+                $stmt = $pdo->prepare("INSERT INTO comment (id_content, id_user, content) VALUES (?, ?, ?)");
+                $stmt->execute([$content_id_cmt, $user['id_user'], $cmt_text]);
+                // Refresh để tránh gửi lại form và scroll tới vị trí
+                header("Location: project.php?id={$project_id}#content-{$content_id_cmt}");
+                exit();
+            }
+        }
+    }
+
+    if ($action === 'delete_comment') {
+        $comment_id = intval($_POST['comment_id'] ?? 0);
+        
+        // Kiểm tra quyền xóa (Chính chủ hoặc Owner/Manager dự án)
+        $stmt = $pdo->prepare("SELECT id_user FROM comment WHERE id_comment = ?");
+        $stmt->execute([$comment_id]);
+        $cmt = $stmt->fetch();
+
+        if ($cmt) {
+            if ($cmt['id_user'] == $user['id_user'] || $is_owner || $user_role == 'manager') {
+                $stmt = $pdo->prepare("DELETE FROM comment WHERE id_comment = ?");
+                $stmt->execute([$comment_id]);
+                // Lấy id content để redirect về đúng chỗ (tùy chọn)
+                // Nhưng ở đây ta cứ refresh trang
+                $success = 'Đã xóa bình luận.';
+            } else {
+                $error = 'Bạn không có quyền xóa bình luận này.';
+            }
+        }
+    }
+
 }
 
 // Lấy nội dung đã duyệt
@@ -151,6 +193,32 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$project_id]);
 $accepted_contents = $stmt->fetchAll();
+
+// --- LẤY DANH SÁCH BÌNH LUẬN ---
+$comments_map = [];
+if (!empty($accepted_contents)) {
+    // Lấy danh sách ID của các bài viết
+    $content_ids = array_column($accepted_contents, 'id_content');
+    
+    // Tạo chuỗi dấu ? cho câu lệnh IN (ví dụ: ?,?,?)
+    $inQuery = implode(',', array_fill(0, count($content_ids), '?'));
+    
+    $stmt = $pdo->prepare("
+        SELECT cm.*, u.full_name, u.user_name 
+        FROM comment cm 
+        JOIN user u ON cm.id_user = u.id_user 
+        WHERE cm.id_content IN ($inQuery) 
+        ORDER BY cm.created_at ASC
+    ");
+    // Thực thi với danh sách ID
+    $stmt->execute($content_ids);
+    $all_comments = $stmt->fetchAll();
+
+    // Gom nhóm comment theo bài viết
+    foreach ($all_comments as $cmt) {
+        $comments_map[$cmt['id_content']][] = $cmt;
+    }
+}
 
 // Lấy nội dung chờ duyệt (chỉ owner và manager)
 $pending_contents = [];
@@ -176,6 +244,100 @@ if ($can_approve) {
     <link rel="stylesheet" href="./css/khonggianuser.css">
     <link rel="stylesheet" href="./css/project.css">
 
+    <style>
+        .comments-section {
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            padding: 15px;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+        .comment-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .comment-avatar {
+            width: 32px;
+            height: 32px;
+            background: #e0e0e0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #555;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .comment-content-box {
+            background: #fff;
+            padding: 8px 12px;
+            border-radius: 15px;
+            border: 1px solid #e0e0e0;
+            display: inline-block;
+            max-width: 100%;
+        }
+        .comment-author {
+            font-weight: bold;
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 2px;
+        }
+        .comment-text {
+            font-size: 14px;
+            color: #444;
+            line-height: 1.4;
+        }
+        .comment-actions {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+            margin-left: 8px;
+        }
+        .btn-delete-cmt {
+            background: none;
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 11px;
+            padding: 0;
+            margin-left: 5px;
+        }
+        .btn-delete-cmt:hover {
+            text-decoration: underline;
+        }
+        .comment-input-form {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            align-items: center;
+        }
+        .comment-input {
+            flex: 1;
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 1px solid #ccc;
+            outline: none;
+            font-size: 14px;
+            transition: border 0.2s;
+        }
+        .comment-input:focus {
+            border-color: #1976d2;
+        }
+        .btn-send-cmt {
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-send-cmt:hover {
+            background: #1565c0;
+        }
+    </style>
 </head>
 <body background="https://vietbookstore.com/cdn/shop/articles/13-facts-about-doraemon-doraemon-1694511477.jpg?v=1720975103&width=1100" style="background-size: cover; background-position: center;">
     <div class="top-bar">
@@ -295,7 +457,6 @@ if ($can_approve) {
         </div>
         <?php endif; ?>
         
-        <!-- Khối toàn bộ nội dung dự án (đã duyệt) -->
         <div style="margin-bottom: 20px;">
             <h2 style="color: #333; font-size: 20px; margin-bottom: 15px; padding-left: 5px;">
                 Bảng tin dự án 
@@ -314,7 +475,6 @@ if ($can_approve) {
         <?php else: ?>
             <?php foreach ($accepted_contents as $content): ?>
                 <div class="content-item" id="content-<?php echo $content['id_content']; ?>">
-                    <!-- Header: Thông tin người đăng -->
                     <div class="content-header">
                         <div class="content-meta">
                             <strong style="color: #333;"><?php echo htmlspecialchars($content['full_name']); ?></strong>
@@ -322,8 +482,6 @@ if ($can_approve) {
                             <span style="color: #8b8b8b; font-size: 12px;"><?php echo date('d/m/Y H:i', strtotime($content['created_at'])); ?></span>
                         </div>
                     </div>
-                    
-                    <!-- Main: Nội dung bài viết -->
                     <div class="content-main">
                         <?php if (!empty($content['title'])): ?>
                             <div class="content-title"><?php echo htmlspecialchars($content['title']); ?></div>
@@ -331,8 +489,6 @@ if ($can_approve) {
                         
                         <div class="content-body"><?php echo nl2br(htmlspecialchars($content['title_detail'])); ?></div>
                     </div>
-                    
-                    <!-- Footer: Các nút hành động -->
                     <div class="content-footer">
                         <div class="content-actions">
                             <?php if ($content['id_user'] == $user['id_user'] || $is_owner || $user_role == 'manager'): ?>
@@ -346,8 +502,52 @@ if ($can_approve) {
                         </div>
                     </div>
                     
-                    <!-- Form sửa nội dung -->
-                        <div class="inline-form hide" id="edit-form-<?php echo $content['id_content']; ?>">
+                    <div class="comments-section">
+                        <?php if (isset($comments_map[$content['id_content']])): ?>
+                            <?php foreach ($comments_map[$content['id_content']] as $cmt): ?>
+                                <div class="comment-item">
+                                    <div class="comment-avatar">
+                                        <?php echo strtoupper(substr($cmt['full_name'], 0, 1)); ?>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div class="comment-content-box">
+                                            <div class="comment-author"><?php echo htmlspecialchars($cmt['full_name']); ?></div>
+                                            <div class="comment-text"><?php echo nl2br(htmlspecialchars($cmt['content'])); ?></div>
+                                        </div>
+                                        <div class="comment-actions">
+                                            <?php echo date('H:i d/m', strtotime($cmt['created_at'])); ?>
+                                            
+                                            <?php if ($cmt['id_user'] == $user['id_user'] || $is_owner || $user_role == 'manager'): ?>
+                                                <span>•</span>
+                                                <form method="POST" style="display:inline;" onsubmit="return confirm('Xóa bình luận này?')">
+                                                    <input type="hidden" name="action" value="delete_comment">
+                                                    <input type="hidden" name="comment_id" value="<?php echo $cmt['id_comment']; ?>">
+                                                    <button type="submit" class="btn-delete-cmt">Xóa</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        <?php if ($can_comment): ?>
+                            <div class="comment-input-form">
+                                <div class="comment-avatar" style="background: #1976d2; color: #fff; width: 32px; height: 32px; font-size: 12px;">ME</div>
+                                <form method="POST" style="flex: 1; display: flex; gap: 8px;">
+                                    <input type="hidden" name="action" value="add_comment">
+                                    <input type="hidden" name="content_id" value="<?php echo $content['id_content']; ?>">
+                                    <input type="text" name="comment_content" class="comment-input" placeholder="Viết bình luận..." required autocomplete="off">
+                                    <button type="submit" class="btn-send-cmt">Gửi</button>
+                                </form>
+                            </div>
+                        <?php else: ?>
+                            <p style="font-size: 13px; color: #999; margin-top: 10px; text-align: center; border-top: 1px dashed #ddd; padding-top: 5px;">
+                                <i>Bạn không có quyền bình luận.</i>
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="inline-form hide" id="edit-form-<?php echo $content['id_content']; ?>">
                             <form method="POST">
                                 <input type="hidden" name="action" value="edit_content">
                                 <input type="hidden" name="content_id" value="<?php echo $content['id_content']; ?>">
@@ -372,7 +572,6 @@ if ($can_approve) {
                 <?php endforeach; ?>
         <?php endif; ?>
         
-        <!-- Khối nội dung chờ duyệt (chỉ owner và manager) -->
         <?php if ($can_approve && !empty($pending_contents)): ?>
         <div class="content-section">
             <h2>
@@ -424,7 +623,6 @@ if ($can_approve) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
-        
         function toggleEdit(id) {
             var el = document.getElementById('edit-form-' + id);
             if (!el) return;

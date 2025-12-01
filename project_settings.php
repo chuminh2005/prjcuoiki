@@ -94,6 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $new_role  = $_POST['new_role'] ?? 'viewer';
         $valid_roles = ['viewer', 'commenter', 'contributor', 'manager'];
 
+
+
         if (!in_array($new_role, $valid_roles)) {
             $error = 'Vai trò không hợp lệ!';
         } else {
@@ -117,7 +119,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
 
                 if ($allow_update) {
-                    $stmt = $pdo->prepare("UPDATE member SET project_role = ? WHERE id_member = ? AND id_project = ?");
+                    $stmt = $pdo->prepare("UPDATE  member SET flag = 'deactive', end_at = current_timestamp()  WHERE  id_member = ? AND id_project = ?");
+                    $stmt->execute([$member_id, $project_id]);
+                    $stmt = $pdo->prepare("INSERT INTO member (id_user, id_project, project_role) SELECT id_user, id_project, ? FROM member WHERE id_member = ? AND id_project = ?");
                     if ($stmt->execute([$new_role, $member_id, $project_id])) {
                         $success = 'Cập nhật vai trò thành công!';
                     } else {
@@ -412,8 +416,50 @@ $members = $stmt->fetchAll();
         .input-group select {
             flex: 1;
         }
+        /* CSS cho hộp gợi ý */
+        .suggestion-box {
+            position: absolute;
+            top: 100%; /* Nằm ngay dưới input */
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 0 0 5px 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none; /* Mặc định ẩn */
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .suggestion-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover {
+            background-color: #f1f8ff; /* Màu hover xanh nhạt */
+        }
+
+        .suggestion-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .suggestion-email {
+            font-size: 12px;
+            color: #666;
+        }
     </style>
 </head>
+<script src="js/project_settings.js"></script>
 <body background="https://vietbookstore.com/cdn/shop/articles/13-facts-about-doraemon-doraemon-1694511477.jpg?v=1720975103&width=1100" style="background-size: cover; background-position: center;">
     <div class="settings-container">
         <div class="settings-header">
@@ -471,17 +517,23 @@ $members = $stmt->fetchAll();
                 <h2>Thành viên dự án</h2>
                 
                 <?php if ($is_owner || $is_manager): ?>
-                <form method="POST">
+               <form method="POST">
                     <input type="hidden" name="action" value="add_member">
-                    
                     <div class="form-group">
                         <label>Thêm thành viên mới</label>
                         <div class="input-group">
-                            <input type="text" name="user_identifier" placeholder="Nhập tên đăng nhập hoặc email">
-                            <select name="project_role">
-                                <option value="viewer"> Người quan sát</option>
-                                <option value="commenter"> Người bình luận</option>
-                                <option value="contributor"> Người đóng góp</option>
+                            
+                            <div style="position: relative; flex: 1;">
+                                <input type="text" 
+                                    id="user_input" 
+                                    name="user_identifier" 
+                                    placeholder="Nhập tên đăng nhập hoặc email" 
+                                    autocomplete="off">
+                                <div id="suggestion_box" class="suggestion-box"></div>
+                            </div>
+                            <select name="project_role" style="flex: 0 0 150px;"> <option value="viewer">Người quan sát</option>
+                                <option value="commenter">Người bình luận</option>
+                                <option value="contributor">Người đóng góp</option>
                                 <option value="manager">Người điều hành</option>
                             </select>
                             <button type="submit" class="btn btn-primary">Thêm</button>
