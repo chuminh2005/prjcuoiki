@@ -242,9 +242,7 @@ function fetch_comments($pdo, $parent_id) {
                     </div>
                 </div>
             </main>
-
-                
-
+            
             <aside class="sidebar">
                 <div class="card">
                     <h3>Thông tin dự án</h3>

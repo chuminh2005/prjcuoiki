@@ -213,7 +213,6 @@ if (isset($_GET['error']) && $_GET['error'] == 'create' && isset($_SESSION['proj
             <div>
                 <div class="card">
                     <h2>Thông báo</h2>
-                    
                     <?php if (empty($notifications)): ?>
                         <div class="empty-state">
                             <div style="font-size: 48px;"></div>
@@ -326,8 +325,7 @@ if (isset($_GET['error']) && $_GET['error'] == 'create' && isset($_SESSION['proj
                 <button type="submit" class="btn btn-secondary" style="width: 100%;">Đổi mật khẩu</button>
             </form>
         </div>
-    </div>
-    
+    </div>  
 <script src="./js/khonggianuser.js"></script>
 </body>
 </html>
