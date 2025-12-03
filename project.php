@@ -141,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // --- XỬ LÝ BÌNH LUẬN ---
+
     // Thêm bình luận
     if ($action === 'add_comment') {
         if (!$can_comment) {
@@ -163,7 +163,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'delete_comment') {
         $comment_id = intval($_POST['comment_id'] ?? 0);
         
-        // Kiểm tra quyền xóa (Chính chủ hoặc Owner/Manager dự án)
         $stmt = $pdo->prepare("SELECT id_user FROM comment WHERE id_comment = ?");
         $stmt->execute([$comment_id]);
         $cmt = $stmt->fetch();

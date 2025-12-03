@@ -235,292 +235,7 @@ $active_members = $stmt->fetch()['count'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản lý phân quyền - Admin</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-        }
-        
-        .admin-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .admin-header {
-            background: white;
-            padding: 20px 30px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .admin-header h1 {
-            font-size: 28px;
-            color: #333;
-        }
-        
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s;
-        }
-        
-        .btn-primary { background: #4a90e2; color: white; }
-        .btn-primary:hover { background: #357abd; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .btn-secondary:hover { background: #545b62; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-success:hover { background: #218838; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-danger:hover { background: #c82333; }
-        .btn.small { padding: 6px 12px; font-size: 13px; }
-        
-        .notice {
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-weight: 500;
-        }
-        
-        .notice-success {
-            background: #d4edda;
-            color: #155724;
-            border-left: 4px solid #28a745;
-        }
-        
-        .notice-error {
-            background: #f8d7da;
-            color: #721c24;
-            border-left: 4px solid #dc3545;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .stat-card h3 {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 10px;
-        }
-        
-        .stat-card .stat-number {
-            font-size: 32px;
-            font-weight: bold;
-            color: #4a90e2;
-        }
-        
-        .section {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        
-        .section h2 {
-            font-size: 22px;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
-            color: #333;
-        }
-        
-        .permission-card {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
-        }
-        
-        .permission-card h3 {
-            font-size: 18px;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        
-        .permission-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 10px;
-            margin-top: 15px;
-        }
-        
-        .permission-item {
-            background: white;
-            padding: 12px;
-            border-radius: 6px;
-            border-left: 3px solid #4a90e2;
-        }
-        
-        .permission-item strong {
-            display: block;
-            color: #333;
-            margin-bottom: 5px;
-        }
-        
-        .permission-item small {
-            color: #666;
-            font-size: 13px;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        table th {
-            background: #f8f9fa;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            color: #555;
-            border-bottom: 2px solid #dee2e6;
-        }
-        
-        table td {
-            padding: 12px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        
-        table tr:hover {
-            background: #f8f9fa;
-        }
-        
-        .badge {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        
-        .badge-admin {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .badge-user {
-            background: #28a745;
-            color: white;
-        }
-        
-        .badge-owner {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .badge-manager {
-            background: #fd7e14;
-            color: white;
-        }
-        
-        .badge-contributor {
-            background: #17a2b8;
-            color: white;
-        }
-        
-        .badge-commenter {
-            background: #ffc107;
-            color: #333;
-        }
-        
-        .badge-viewer {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .role-select {
-            padding: 6px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 13px;
-            cursor: pointer;
-        }
-        
-        .role-select:hover {
-            border-color: #4a90e2;
-        }
-        
-        .permission-toggle {
-            width: 30px;
-            height: 30px;
-            border: 1px solid #ddd;
-            background: white;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.15s;
-            color: #999;
-            padding: 0;
-        }
-        
-        .permission-toggle:hover {
-            border-color: #999;
-        }
-        
-        .permission-toggle.active {
-            background: #d4edda;
-            border-color: #28a745;
-            color: #28a745;
-        }
-        
-        .permission-toggle.active:hover {
-            background: #c3e6cb;
-        }
-        
-        .notice-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-        }
-        
-        .notice-toast {
-            padding: 12px 20px;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            animation: slideIn 0.3s ease-out;
-        }
-        
-        @keyframes slideIn {
-            from {
-                transform: translateX(400px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="css/admin_permissions.css">
 </head>
 <body>
     <div class="admin-container">
@@ -560,25 +275,12 @@ $active_members = $stmt->fetch()['count'];
             </div>
         </div>
         
-        <!-- Giải thích hệ thống phân quyền -->
-        <div class="section">
-            <h2>Vai trò trong dự án</h2>
-            <div class="permission-list">
-                <?php foreach ($project_roles as $role): ?>
-                <div class="permission-item">
-                    <strong><?php echo htmlspecialchars($role['role_name']); ?></strong>
-                    <small><?php echo htmlspecialchars($role['description']); ?></small>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
+
         
         <!-- Quản lý quyền chi tiết trong dự án -->
         <div class="section">
             <h2>Quản lý quyền chi tiết thành viên</h2>
-            <p style="color: #666; margin-bottom: 15px;">
-                Cấp hoặc thu hồi quyền cụ thể cho từng thành viên trong dự án. Ví dụ: viewer có thể được cấp quyền tạo bình luận.
-            </p>
+
             <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <div style="width: 16px; height: 16px; background: #d4edda; border: 1px solid #28a745; border-radius: 3px;"></div>
@@ -612,12 +314,8 @@ $active_members = $stmt->fetch()['count'];
                                         <th style="min-width: 150px;">Thành viên</th>
                                         <th>Vai trò</th>
                                         <?php foreach ($permissions as $perm): ?>
-                                        <th style="min-width: 100px; font-size: 12px;" title="<?php echo htmlspecialchars($perm['description']); ?>">
-                                            <?php 
-                                            $short_name = str_replace(['view_', 'create_', 'edit_', 'delete_', 'manage_', 'approve_'], '', $perm['permision_name']);
-                                            $short_name = str_replace('_', ' ', $short_name);
-                                            echo htmlspecialchars(ucfirst($short_name)); 
-                                            ?>
+                                        <th style="min-width: 100px; font-size: 12px; text-align: center;" title="<?php echo htmlspecialchars($perm['description']); ?>">
+                                            <?php echo htmlspecialchars($perm['description']); ?>
                                         </th>
                                         <?php endforeach; ?>
                                     </tr>
@@ -629,9 +327,17 @@ $active_members = $stmt->fetch()['count'];
                                             <strong><?php echo htmlspecialchars($member['user_name']); ?></strong><br>
                                             <small style="color: #666;"><?php echo htmlspecialchars($member['full_name']); ?></small>
                                         </td>
-                                        <td>
+                                        <td style="min-width: 150px;">
                                             <span class="badge badge-<?php echo $member['project_role']; ?>" style="font-size: 11px;">
-                                                <?php echo htmlspecialchars($member['project_role']); ?>
+                                                <?php 
+                                                $role_vn = [
+                                                    'manager' => 'Quản lý',
+                                                    'contributor' => 'Người đóng góp',
+                                                    'commenter' => 'Bình luận',
+                                                    'viewer' => 'Xem'
+                                                ];
+                                                echo htmlspecialchars($role_vn[$member['project_role']] ?? $member['project_role']); 
+                                                ?>
                                             </span>
                                         </td>
                                         <?php foreach ($permissions as $perm): ?>
@@ -668,64 +374,7 @@ $active_members = $stmt->fetch()['count'];
             <?php endif; ?>
         </div>
         
-        <!-- Phân quyền hệ thống -->
-        <div class="section">
-            <h2>Phân quyền hệ thống (<?php echo count($users); ?>)</h2>
-            <p style="color: #666; margin-bottom: 20px;">
-                Quản lý quyền Admin/User toàn hệ thống. Admin có toàn quyền, User chỉ quản lý dự án của mình.
-            </p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Tên đăng nhập</th>
-                        <th>Họ tên</th>
-                        <th>Email</th>
-                        <th>Vai trò hệ thống</th>
-                        <th>Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($users as $u): ?>
-                    <tr>
-                        <td><?php echo $u['id_user']; ?></td>
-                        <td><strong><?php echo htmlspecialchars($u['user_name']); ?></strong></td>
-                        <td><?php echo htmlspecialchars($u['full_name']); ?></td>
-                        <td><?php echo htmlspecialchars($u['email']); ?></td>
-                        <td>
-                            <span class="badge <?php echo $u['id_role'] == 1 ? 'badge-admin' : 'badge-user'; ?>">
-                                <?php echo htmlspecialchars($u['role_name']); ?>
-                            </span>
-                        </td>
-                        <td>
-                            <?php if ($u['id_user'] != $user['id_user']): ?>
-                                <form method="POST" style="display: inline;">
-                                    <input type="hidden" name="action" value="update_system_role">
-                                    <input type="hidden" name="user_id" value="<?php echo $u['id_user']; ?>">
-                                    
-                                    <?php if ($u['id_role'] == 2): ?>
-                                        <input type="hidden" name="new_role" value="1">
-                                        <button class="btn btn-success small" type="submit" onclick="return confirm('Bạn chắc chắn muốn nâng quyền Admin cho người dùng này?')">
-                                            Lên Admin
-                                        </button>
-                                    <?php else: ?>
-                                        <input type="hidden" name="new_role" value="2">
-                                        <button class="btn btn-danger small" type="submit" onclick="return confirm('Bạn chắc chắn muốn hạ xuống User?')">
-                                            Hạ User
-                                        </button>
-                                    <?php endif; ?>
-                                </form>
-                            <?php else: ?>
-                                <span style="color: #999; font-size: 13px;">(Bạn)</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
+        
     <div class="notice-container" id="noticeContainer"></div>
     
     <script>
@@ -778,7 +427,7 @@ $active_members = $stmt->fetch()['count'];
         setTimeout(() => {
             notice.style.animation = 'slideIn 0.3s ease-out reverse';
             setTimeout(() => notice.remove(), 300);
-        }, 2000);
+        }, 1000);
     }
     </script>
 </body>

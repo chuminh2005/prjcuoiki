@@ -47,27 +47,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Lấy danh sách người dùng
+// Lấy danh sách người dùng với phân trang
 $search = $_GET['search'] ?? '';
-$role_filter = $_GET['role'] ?? '';
+$search_type = $_GET['search_type'] ?? 'username'; // username hoặc full_name
+$page = intval($_GET['page'] ?? 1);
+$limit = 10;
+$offset = ($page - 1) * $limit;
 
+// Đếm tổng số người dùng (để phân trang)
+$count_sql = "SELECT COUNT(*) as total FROM user u WHERE 1=1";
+$count_params = [];
+
+if (!empty($search)) {
+    if ($search_type === 'username') {
+        $count_sql .= " AND u.user_name LIKE ?";
+        $count_params[] = "%{$search}%";
+    } elseif ($search_type === 'full_name') {
+        $count_sql .= " AND u.full_name LIKE ?";
+        $count_params[] = "%{$search}%";
+    }
+}
+
+$count_stmt = $pdo->prepare($count_sql);
+$count_stmt->execute($count_params);
+$total_users = $count_stmt->fetch()['total'];
+$total_pages = ceil($total_users / $limit);
+
+// Lấy danh sách người dùng
 $sql = "SELECT u.*, r.role_name FROM user u JOIN role r ON u.id_role = r.id_role WHERE 1=1";
 $params = [];
 
 if (!empty($search)) {
-    $sql .= " AND (u.user_name LIKE ? OR u.full_name LIKE ? OR u.email LIKE ?)";
-    $search_param = "%{$search}%";
-    $params[] = $search_param;
-    $params[] = $search_param;
-    $params[] = $search_param;
+    if ($search_type === 'username') {
+        $sql .= " AND u.user_name LIKE ?";
+        $params[] = "%{$search}%";
+    } elseif ($search_type === 'full_name') {
+        $sql .= " AND u.full_name LIKE ?";
+        $params[] = "%{$search}%";
+    }
 }
 
-if (!empty($role_filter)) {
-    $sql .= " AND u.id_role = ?";
-    $params[] = $role_filter;
-}
-
-$sql .= " ORDER BY u.`creat-at` DESC";
+$sql .= " ORDER BY u.`creat-at` DESC LIMIT {$limit} OFFSET {$offset}";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
@@ -86,205 +106,7 @@ $user_count = $stmt->fetch()['count'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản lý người dùng - Admin</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-        }
-        
-        .admin-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .admin-header {
-            background: white;
-            padding: 20px 30px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .admin-header h1 {
-            font-size: 28px;
-            color: #333;
-        }
-        
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s;
-        }
-        
-        .btn-primary { background: #4a90e2; color: white; }
-        .btn-primary:hover { background: #357abd; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .btn-secondary:hover { background: #545b62; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-success:hover { background: #218838; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-danger:hover { background: #c82333; }
-        .btn.small { padding: 6px 12px; font-size: 13px; }
-        
-        .notice {
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-weight: 500;
-        }
-        
-        .notice-success {
-            background: #d4edda;
-            color: #155724;
-            border-left: 4px solid #28a745;
-        }
-        
-        .notice-error {
-            background: #f8d7da;
-            color: #721c24;
-            border-left: 4px solid #dc3545;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .stat-card h3 {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 10px;
-        }
-        
-        .stat-card .stat-number {
-            font-size: 32px;
-            font-weight: bold;
-            color: #4a90e2;
-        }
-        
-        .filter-section {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .filter-form {
-            display: flex;
-            gap: 15px;
-            align-items: end;
-            flex-wrap: wrap;
-        }
-        
-        .form-group {
-            flex: 1;
-            min-width: 200px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #333;
-            font-size: 14px;
-        }
-        
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        
-        .section {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .section h2 {
-            font-size: 22px;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
-            color: #333;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        table th {
-            background: #f8f9fa;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            color: #555;
-            border-bottom: 2px solid #dee2e6;
-        }
-        
-        table td {
-            padding: 12px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        
-        table tr:hover {
-            background: #f8f9fa;
-        }
-        
-        .badge {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        
-        .badge-admin {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .badge-user {
-            background: #28a745;
-            color: white;
-        }
-        
-        .actions {
-            display: flex;
-            gap: 5px;
-        }
-    </style>
+    <link rel="stylesheet" href="css/admin_users.css">
 </head>
 <body>
     <div class="admin-container">
@@ -324,21 +146,20 @@ $user_count = $stmt->fetch()['count'];
         <div class="filter-section">
             <form method="GET" class="filter-form">
                 <div class="form-group">
-                    <label>Tìm kiếm</label>
-                    <input type="text" name="search" placeholder="Tên, email, username..." value="<?php echo htmlspecialchars($search); ?>">
-                </div>
-                
-                <div class="form-group">
-                    <label>Vai trò</label>
-                    <select name="role">
-                        <option value="">Tất cả</option>
-                        <option value="1" <?php echo $role_filter == '1' ? 'selected' : ''; ?>>Admin</option>
-                        <option value="2" <?php echo $role_filter == '2' ? 'selected' : ''; ?>>User</option>
+                    <label>Loại tìm kiếm</label>
+                    <select name="search_type">
+                        <option value="username" <?php echo $search_type == 'username' ? 'selected' : ''; ?>>Username</option>
+                        <option value="full_name" <?php echo $search_type == 'full_name' ? 'selected' : ''; ?>>Họ và tên</option>
                     </select>
                 </div>
                 
                 <div class="form-group">
-                    <button type="submit" class="btn btn-primary">Lọc</button>
+                    <label>Từ khóa</label>
+                    <input type="text" name="search" placeholder="Nhập từ khóa tìm kiếm..." value="<?php echo htmlspecialchars($search); ?>">
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Tìm kiếm</button>
                     <a href="admin_users.php" class="btn btn-secondary">Xóa lọc</a>
                 </div>
             </form>
@@ -346,7 +167,10 @@ $user_count = $stmt->fetch()['count'];
         
         <!-- Danh sách người dùng -->
         <div class="section">
-            <h2>Danh sách người dùng (<?php echo count($users); ?>)</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; padding: 0; border: none;">Danh sách người dùng (Trang <?php echo $page; ?>/<?php echo $total_pages; ?>)</h2>
+                <span style="color: #666;">Hiển thị <?php echo count($users); ?> / <?php echo $total_users; ?> người dùng</span>
+            </div>
             <table>
                 <thead>
                     <tr>
@@ -410,6 +234,31 @@ $user_count = $stmt->fetch()['count'];
                     <?php endif; ?>
                 </tbody>
             </table>
+            
+            <!-- Phân trang -->
+            <?php if ($total_pages > 1): ?>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #dee2e6;">
+                <?php
+                $query_params = [];
+                if (!empty($search)) $query_params['search'] = $search;
+                if (!empty($search_type)) $query_params['search_type'] = $search_type;
+                ?>
+                
+                <?php if ($page > 1): ?>
+                    <a href="?<?php echo http_build_query(array_merge($query_params, ['page' => 1])); ?>" class="btn btn-secondary small">« Đầu</a>
+                    <a href="?<?php echo http_build_query(array_merge($query_params, ['page' => $page - 1])); ?>" class="btn btn-secondary small">‹ Trước</a>
+                <?php endif; ?>
+                
+                <span style="padding: 0 15px; color: #666; font-weight: 600;">
+                    Trang <?php echo $page; ?> / <?php echo $total_pages; ?>
+                </span>
+                
+                <?php if ($page < $total_pages): ?>
+                    <a href="?<?php echo http_build_query(array_merge($query_params, ['page' => $page + 1])); ?>" class="btn btn-secondary small">Sau ›</a>
+                    <a href="?<?php echo http_build_query(array_merge($query_params, ['page' => $total_pages])); ?>" class="btn btn-secondary small">Cuối »</a>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </body>

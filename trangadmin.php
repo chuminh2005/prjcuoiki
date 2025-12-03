@@ -303,38 +303,6 @@ $recent_users = $stmt->fetchAll();
             </div>
         </div>
         
-        <!-- Người dùng gần đây -->
-        <div class="section">
-            <h2>Người dùng đăng ký gần đây</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Tên đăng nhập</th>
-                        <th>Họ tên</th>
-                        <th>Email</th>
-                        <th>Vai trò</th>
-                        <th>Ngày tạo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($recent_users as $u): ?>
-                    <tr>
-                        <td><?php echo $u['id_user']; ?></td>
-                        <td><?php echo htmlspecialchars($u['user_name']); ?></td>
-                        <td><?php echo htmlspecialchars($u['full_name']); ?></td>
-                        <td><?php echo htmlspecialchars($u['email']); ?></td>
-                        <td>
-                            <span class="badge <?php echo $u['id_role'] == 1 ? 'badge-admin' : 'badge-user'; ?>">
-                                <?php echo htmlspecialchars($u['role_name']); ?>
-                            </span>
-                        </td>
-                        <td><?php echo date('d/m/Y H:i', strtotime($u['creat-at'])); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
     </div>
 </body>
 </html>
